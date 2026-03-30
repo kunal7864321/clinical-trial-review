@@ -1,0 +1,44 @@
+name: clinical-trial-review
+version: "1.0.0"
+description: "An environment for training AI agents to review clinical trial protocols for safety violations, regulatory compliance failures, and internal contradictions"
+author: "OpenEnv Hackathon Team"
+
+tasks:
+  - id: 1
+    name: "Missing Section Detection"
+    difficulty: easy
+    max_steps: 20
+  - id: 2
+    name: "Dosage Safety Compliance"
+    difficulty: medium
+    max_steps: 20
+  - id: 3
+    name: "Contradiction Detection"
+    difficulty: hard
+    max_steps: 20
+
+observation_space:
+  type: object
+  fields:
+    trial_id: string
+    protocol_text: object
+    task_description: string
+    step_number: integer
+    available_actions: array
+
+action_space:
+  type: object
+  fields:
+    action_type: string
+    target_section: string
+    issue_description: string
+    severity: string
+
+reward_range:
+  low: 0.0
+  high: 1.0
+
+endpoints:
+  reset: POST /reset
+  step: POST /step
+  state: GET /state

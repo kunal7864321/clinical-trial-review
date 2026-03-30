@@ -1,0 +1,39 @@
+{
+  "trial_id": "TRIAL-002",
+  "title": "Phase III Study of DrugY in Type 2 Diabetes Management",
+  "sections": {
+    "objectives": "To assess the safety and efficacy of DrugY in controlling blood glucose in Type 2 diabetic patients",
+    "inclusion_criteria": "Patients aged 30-70 diagnosed with Type 2 diabetes for at least 2 years",
+    "exclusion_criteria": "Patients with liver disease or currently on insulin therapy",
+    "dosage": {
+      "drug": "DrugY",
+      "dose_mg": 1800,
+      "frequency": "once daily",
+      "max_daily_mg": 1800
+    },
+    "statistical_analysis_plan": "Primary endpoint analysis using ANCOVA with baseline HbA1c as covariate",
+    "withdrawal_criteria": "Patients will be withdrawn if HbA1c rises above 10% or serious adverse event occurs",
+    "informed_consent": "Written informed consent obtained from all patients prior to enrollment",
+    "adverse_event_reporting": "All adverse events logged within 48 hours. Grade 4 events reported immediately"
+  },
+  "ground_truth": {
+    "missing_sections": [
+      "inclusion_criteria_age_upper_conflict"
+    ],
+    "unsafe_dosages": [],
+    "contradictions": [
+      {
+        "id": "C1",
+        "section_a": "inclusion_criteria",
+        "section_b": "exclusion_criteria",
+        "description": "Inclusion criteria allows patients up to age 70 but exclusion criteria does not address elderly patients with reduced liver function which is common above age 65"
+      },
+      {
+        "id": "C2",
+        "section_a": "dosage",
+        "section_b": "adverse_event_reporting",
+        "description": "Dosage section states once daily administration but adverse event reporting references twice daily monitoring schedule creating inconsistency"
+      }
+    ]
+  }
+}

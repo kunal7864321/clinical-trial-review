@@ -1,0 +1,45 @@
+{
+  "trial_id": "TRIAL-003",
+  "title": "Phase I Study of DrugZ in Pediatric Asthma",
+  "sections": {
+    "objectives": "To determine the maximum tolerated dose of DrugZ in pediatric asthma patients",
+    "inclusion_criteria": "Children aged 6-12 with moderate to severe asthma confirmed by spirometry",
+    "exclusion_criteria": "Patients with known hypersensitivity to DrugZ or related compounds",
+    "dosage": {
+      "drug": "DrugZ",
+      "dose_mg": 900,
+      "frequency": "three times daily",
+      "max_daily_mg": 2700
+    },
+    "adverse_event_reporting": "All adverse events must be reported within 12 hours given pediatric population"
+  },
+  "ground_truth": {
+    "missing_sections": [
+      "statistical_analysis_plan",
+      "withdrawal_criteria",
+      "informed_consent"
+    ],
+    "unsafe_dosages": [
+      {
+        "drug": "DrugZ",
+        "given_daily_mg": 2700,
+        "max_allowed_mg": 750,
+        "violation": "DrugZ daily dose of 2700mg massively exceeds WHO maximum of 750mg especially dangerous in pediatric population"
+      }
+    ],
+    "contradictions": [
+      {
+        "id": "C1",
+        "section_a": "inclusion_criteria",
+        "section_b": "objectives",
+        "description": "Objectives state finding maximum tolerated dose which is a Phase I goal but inclusion criteria restricts to children aged 6-12 making maximum dose escalation ethically contradictory in pediatric patients"
+      },
+      {
+        "id": "C2",
+        "section_a": "dosage",
+        "section_b": "inclusion_criteria",
+        "description": "Dosage is set for adult weight ranges but inclusion criteria only includes children aged 6-12 whose body weight requires significantly lower dosing"
+      }
+    ]
+  }
+}

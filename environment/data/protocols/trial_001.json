@@ -1,0 +1,39 @@
+{
+  "trial_id": "TRIAL-001",
+  "title": "Phase II Study of DrugX in Adult Hypertension",
+  "sections": {
+    "objectives": "To evaluate the efficacy of DrugX in reducing systolic blood pressure in adults",
+    "inclusion_criteria": "Adults aged 18-65 with systolic BP greater than 140mmHg and no prior cardiac surgery",
+    "exclusion_criteria": "Pregnant women, patients with renal failure, patients under 18",
+    "dosage": {
+      "drug": "DrugX",
+      "dose_mg": 850,
+      "frequency": "twice daily",
+      "max_daily_mg": 1700
+    },
+    "adverse_event_reporting": "All Grade 3 and above events must be reported within 24 hours to the safety board"
+  },
+  "ground_truth": {
+    "missing_sections": [
+      "statistical_analysis_plan",
+      "withdrawal_criteria",
+      "informed_consent"
+    ],
+    "unsafe_dosages": [
+      {
+        "drug": "DrugX",
+        "given_daily_mg": 1700,
+        "max_allowed_mg": 500,
+        "violation": "DrugX daily dose of 1700mg exceeds WHO maximum of 500mg"
+      }
+    ],
+    "contradictions": [
+      {
+        "id": "C1",
+        "section_a": "exclusion_criteria",
+        "section_b": "inclusion_criteria",
+        "description": "Exclusion criteria says patients under 18 are excluded but inclusion criteria does not specify a minimum age clearly"
+      }
+    ]
+  }
+}
