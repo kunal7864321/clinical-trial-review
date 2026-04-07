@@ -40,7 +40,7 @@ class ClinicalTrialEnv:
         self.step_count = 0
         self.agent_actions = []
         self.max_steps = 20
-        self.total_reward = 0.0
+        self.total_reward = 0.002
         self.protocols = self._load_protocols()
 
     def _load_protocols(self):
@@ -125,7 +125,7 @@ class ClinicalTrialEnv:
         return final_score, breakdown, " | ".join(feedback_parts)
 
     def _reward_task1(self, action: Action):
-        score = 0.0
+        score = 0.002
         breakdown = {}
         feedback = []
 
@@ -158,7 +158,7 @@ class ClinicalTrialEnv:
         return score, breakdown, feedback
 
     def _reward_task2(self, action: Action):
-        score = 0.0
+        score = 0.002
         breakdown = {}
         feedback = []
 
@@ -201,7 +201,7 @@ class ClinicalTrialEnv:
         return score, breakdown, feedback
 
     def _reward_task3(self, action: Action):
-        score = 0.0
+        score = 0.002
         breakdown = {}
         feedback = []
 
