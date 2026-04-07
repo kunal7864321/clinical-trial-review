@@ -12,12 +12,37 @@ except ModuleNotFoundError:
 from openai import OpenAI
 
 
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o-mini")
-HF_TOKEN = os.environ.get("HF_TOKEN", "")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+HF_TOKEN = os.environ.get("HF_TOKEN")
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 BASE_URL = os.environ.get("ENV_URL", "http://127.0.0.1:8000")
 
+if not HF_TOKEN:
+    raise RuntimeError("HF_TOKEN environment variable is required to run inference.")
+
 client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
+
+
+def log_start(task_id, trial_id):
+    print(f"START task_id={task_id} trial_id={trial_id}")
+
+
+def log_step(task_id, step_number, action, reward, done, feedback):
+    print(
+        "STEP "
+        f"task_id={task_id} "
+        f"step={step_number} "
+        f"action={action.get('action_type')} "
+        f"target={action.get('target_section')} "
+        f"reward={reward:.3f} "
+        f"done={str(done).lower()} "
+        f"feedback={json.dumps(feedback) if feedback else 'null'}"
+    )
+
+
+def log_end(task_id, final_score):
+    print(f"END task_id={task_id} final_score={final_score:.3f}")
 
 
 def _build_url(url, params):
@@ -115,15 +140,9 @@ def parse_action(raw_text):
 
 def run_task(task_id):
     """Run one full episode for a given task and return the final score."""
-    print(f"\n{'=' * 50}")
-    print(f"Running Task {task_id}...")
-    print(f"{'=' * 50}")
-
-    # reset the environment
     obs = post_env("/reset", params={"task_id": task_id})
 
-    print(f"Trial: {obs['trial_id']}")
-    print(f"Task: {obs['task_description'][:80]}...")
+    log_start(task_id, obs["trial_id"])
 
     total_reward = 0.0
     done = False
@@ -137,10 +156,6 @@ def run_task(task_id):
         )
         action = parse_action(raw)
 
-        print(
-            f"\nStep {step + 1}: {action['action_type']} → {action['target_section']}"
-        )
-
         # send action to environment
         result_data = post_env("/step", payload=action)
 
@@ -150,29 +165,27 @@ def run_task(task_id):
         done = result_data["done"]
         obs = result_data["observation"]
 
-        print(f"Reward: {reward} | Feedback: {feedback}")
+        log_step(
+            task_id,
+            step_number=step + 1,
+            action=action,
+            reward=reward,
+            done=done,
+            feedback=feedback,
+        )
         step += 1
 
     final_score = max(0.0, min(1.0, total_reward))
-    print(f"\nTask {task_id} Final Score: {final_score:.3f}")
+    log_end(task_id, final_score)
     return final_score
 
 
 def main():
-    print("Clinical Trial Review Environment — Baseline Inference")
-    print("Model:", MODEL_NAME)
-    print("API:", API_BASE_URL)
-
     scores = {}
     for task_id in [1, 2, 3]:
         scores[f"task_{task_id}"] = run_task(task_id)
-
-    print(f"\n{'=' * 50}")
-    print("FINAL BASELINE SCORES")
-    print(f"{'=' * 50}")
-    for task, score in scores.items():
-        print(f"{task}: {score:.3f}")
-    print(f"Average: {sum(scores.values()) / len(scores):.3f}")
+    average = sum(scores.values()) / len(scores)
+    print("SUMMARY average_score={:.3f}".format(average))
 
 
 if __name__ == "__main__":
