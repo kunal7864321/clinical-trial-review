@@ -80,7 +80,7 @@ class ClinicalTrialEnv:
         self.agent_actions.append(action.model_dump())
 
         reward_score, breakdown, feedback = self._calculate_reward(action)
-        self.total_reward += reward_score
+        self.total_reward = max(0.002, min(0.998, self.total_reward + reward_score))
 
         done = self.step_count >= self.max_steps
 
