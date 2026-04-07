@@ -169,8 +169,8 @@ def run_task(task_id):
     except Exception as exc:
         print(f"[WARN] Failed to reset environment: {exc}", file=sys.stderr)
         log_start(task_id, "unknown")
-        log_end(task_id, 0.001)
-        return 0.001
+        log_end(task_id, 0.002)
+        return 0.002
 
     log_start(task_id, obs["trial_id"])
 
