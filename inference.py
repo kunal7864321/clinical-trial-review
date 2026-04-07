@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import urllib.error
 import urllib.parse
@@ -14,7 +15,11 @@ from openai import OpenAI
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN = os.environ.get("HF_TOKEN", os.environ.get("HF_API_KEY"))
+HF_TOKEN = (
+    os.environ.get("HF_TOKEN")
+    or os.environ.get("HF_API_KEY")
+    or os.environ.get("HuggingFaceHubApiToken")
+)
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 BASE_URL = os.environ.get("ENV_URL", "http://127.0.0.1:7860")
 
@@ -22,6 +27,7 @@ if HF_TOKEN:
     client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
 else:
     client = None
+    print("[WARN] No HF_TOKEN found, LLM calls will use fallback", file=sys.stderr)
 
 
 def log_start(task_id, trial_id):
@@ -90,8 +96,13 @@ def post_env(path, params=None, payload=None, timeout=30):
 def ask_agent(task_description, protocol_text, step_number):
     """Ask the LLM what action to take given the current observation."""
     if client is None:
-        raise RuntimeError(
-            "OpenAI client not initialized. Set HF_TOKEN or HF_API_KEY environment variable."
+        return json.dumps(
+            {
+                "action_type": "flag_issue",
+                "target_section": "unknown",
+                "issue_description": "No LLM client available",
+                "severity": "low",
+            }
         )
 
     prompt = f"""You are an expert clinical trial protocol reviewer.
@@ -120,9 +131,17 @@ Do not include any text outside the JSON object."""
             max_tokens=300,
             temperature=0.1,
         )
+        return response.choices[0].message.content
     except Exception as exc:
-        raise RuntimeError(f"LLM request failed: {exc}") from exc
-    return response.choices[0].message.content
+        print(f"[WARN] LLM request failed: {exc}", file=sys.stderr)
+        return json.dumps(
+            {
+                "action_type": "flag_issue",
+                "target_section": "unknown",
+                "issue_description": f"LLM call failed: {exc}",
+                "severity": "low",
+            }
+        )
 
 
 def parse_action(raw_text):
