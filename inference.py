@@ -174,7 +174,7 @@ def run_task(task_id):
 
     log_start(task_id, obs["trial_id"])
 
-    total_reward = 0.0
+    total_reward = 0.002
     done = False
     step = 0
     max_steps = 10

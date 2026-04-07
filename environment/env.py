@@ -57,7 +57,7 @@ class ClinicalTrialEnv:
         self.current_task_id = task_id
         self.step_count = 0
         self.agent_actions = []
-        self.total_reward = 0.0
+        self.total_reward = 0.002
 
         task_descriptions = {
             1: "TASK 1 - EASY: Read this clinical trial protocol carefully. Identify all MISSING required sections. Required sections are: objectives, inclusion_criteria, exclusion_criteria, dosage, adverse_event_reporting, statistical_analysis_plan, withdrawal_criteria, informed_consent. Flag each missing section using action_type='flag_issue'.",
@@ -112,7 +112,7 @@ class ClinicalTrialEnv:
     def _calculate_reward(self, action: Action):
         breakdown = {}
         feedback_parts = []
-        score = 0.0
+        score = 0.002
 
         if self.current_task_id == 1:
             score, breakdown, feedback_parts = self._reward_task1(action)

@@ -35,8 +35,8 @@ action_space:
     severity: string
 
 reward_range:
-  low: 0.0
-  high: 1.0
+  low: 0.001
+  high: 0.999
 
 endpoints:
   reset: POST /reset
