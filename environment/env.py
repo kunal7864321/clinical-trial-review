@@ -1,8 +1,8 @@
 import json
 import os
 import random
-from typing import Any
-from pydantic import BaseModel
+from typing import Any, Literal
+from pydantic import BaseModel, Field
 from environment.data.rules import REQUIRED_SECTIONS, MAX_DRUG_DOSES, AGE_GUIDELINES
 
 
@@ -18,10 +18,10 @@ class Observation(BaseModel):
 
 
 class Action(BaseModel):
-    action_type: str  # "flag_issue", "approve_section", "recommend_amendment"
+    action_type: Literal["flag_issue", "approve_section", "recommend_amendment"]
     target_section: str  # which section this action is about
     issue_description: str  # agent's explanation
-    severity: str  # "low", "medium", "high", "critical"
+    severity: Literal["low", "medium", "high", "critical"]
 
 
 class Reward(BaseModel):
@@ -41,6 +41,7 @@ class ClinicalTrialEnv:
         self.agent_actions = []
         self.max_steps = 20
         self.total_reward = 0.002
+        self.current_task_description = ""
         self.protocols = self._load_protocols()
 
     def _load_protocols(self):
@@ -55,9 +56,9 @@ class ClinicalTrialEnv:
     def reset(self, task_id: int = 1) -> Observation:
         self.current_protocol = random.choice(self.protocols)
         self.current_task_id = task_id
+        self.total_reward = 0.002
         self.step_count = 0
         self.agent_actions = []
-        self.total_reward = 0.002
 
         task_descriptions = {
             1: "TASK 1 - EASY: Read this clinical trial protocol carefully. Identify all MISSING required sections. Required sections are: objectives, inclusion_criteria, exclusion_criteria, dosage, adverse_event_reporting, statistical_analysis_plan, withdrawal_criteria, informed_consent. Flag each missing section using action_type='flag_issue'.",
@@ -65,10 +66,11 @@ class ClinicalTrialEnv:
             3: "TASK 3 - HARD: Read this clinical trial protocol carefully. Identify any internal contradictions between different sections of the protocol. A contradiction is when two sections say things that conflict with each other. Flag each contradiction using action_type='flag_issue' and explain both sections that conflict.",
         }
 
+        self.current_task_description = task_descriptions[task_id]
         return Observation(
             trial_id=self.current_protocol["trial_id"],
             protocol_text=self.current_protocol["sections"],
-            task_description=task_descriptions[task_id],
+            task_description=self.current_task_description,
             step_number=0,
             available_actions=["flag_issue", "approve_section", "recommend_amendment"],
         )
@@ -85,7 +87,7 @@ class ClinicalTrialEnv:
         next_obs = Observation(
             trial_id=self.current_protocol["trial_id"],
             protocol_text=self.current_protocol["sections"],
-            task_description=f"Continue reviewing. Step {self.step_count} of {self.max_steps}.",
+            task_description=self.current_task_description,
             step_number=self.step_count,
             available_actions=["flag_issue", "approve_section", "recommend_amendment"],
         )

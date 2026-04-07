@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -145,19 +146,25 @@ Do not include any text outside the JSON object."""
 
 
 def parse_action(raw_text):
-    """Parse the LLM response into a valid action dict."""
+    """Parses JSON from LLM response, handling markdown blocks and extra text."""
     try:
-        raw_text = raw_text.strip()
-        if raw_text.startswith("```"):
-            raw_text = raw_text.split("```")[1]
-            if raw_text.startswith("json"):
-                raw_text = raw_text[4:]
+        # Try to find JSON in markdown blocks
+        json_match = re.search(r"```json\s*(.*?)\s*```", raw_text, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group(1).strip())
+        
+        # Try to find anything that looks like a JSON object
+        json_match = re.search(r"(\{.*\})", raw_text, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group(1).strip())
+
         return json.loads(raw_text.strip())
-    except Exception:
+    except Exception as e:
+        print(f"[WARN] Failed to parse action JSON: {e}")
         return {
             "action_type": "flag_issue",
             "target_section": "unknown",
-            "issue_description": "Could not parse agent response",
+            "issue_description": f"Could not parse agent response: {raw_text[:100]}...",
             "severity": "low",
         }
 
@@ -177,7 +184,7 @@ def run_task(task_id):
     total_reward = 0.002
     done = False
     step = 0
-    max_steps = 10
+    max_steps = 20
 
     while not done and step < max_steps:
         try:
