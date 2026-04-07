@@ -164,40 +164,48 @@ def parse_action(raw_text):
 
 def run_task(task_id):
     """Run one full episode for a given task and return the final score."""
-    obs = post_env("/reset", params={"task_id": task_id})
+    try:
+        obs = post_env("/reset", params={"task_id": task_id})
+    except Exception as exc:
+        print(f"[WARN] Failed to reset environment: {exc}", file=sys.stderr)
+        log_start(task_id, "unknown")
+        log_end(task_id, 0.001)
+        return 0.001
 
     log_start(task_id, obs["trial_id"])
 
     total_reward = 0.0
     done = False
     step = 0
-    max_steps = 10  # limit steps in inference to save time
+    max_steps = 10
 
     while not done and step < max_steps:
-        # ask the agent what to do
-        raw = ask_agent(
-            obs["task_description"], obs["protocol_text"], obs["step_number"]
-        )
-        action = parse_action(raw)
+        try:
+            raw = ask_agent(
+                obs["task_description"], obs["protocol_text"], obs["step_number"]
+            )
+            action = parse_action(raw)
 
-        # send action to environment
-        result_data = post_env("/step", payload=action)
+            result_data = post_env("/step", payload=action)
 
-        reward = result_data["reward"]["score"]
-        feedback = result_data["reward"]["feedback"]
-        total_reward += reward
-        done = result_data["done"]
-        obs = result_data["observation"]
+            reward = result_data["reward"]["score"]
+            feedback = result_data["reward"]["feedback"]
+            total_reward += reward
+            done = result_data["done"]
+            obs = result_data["observation"]
 
-        log_step(
-            task_id,
-            step_number=step + 1,
-            action=action,
-            reward=reward,
-            done=done,
-            feedback=feedback,
-        )
-        step += 1
+            log_step(
+                task_id,
+                step_number=step + 1,
+                action=action,
+                reward=reward,
+                done=done,
+                feedback=feedback,
+            )
+            step += 1
+        except Exception as exc:
+            print(f"[WARN] Step failed: {exc}", file=sys.stderr)
+            done = True
 
     final_score = max(0.001, min(0.999, total_reward))
     log_end(task_id, final_score)
