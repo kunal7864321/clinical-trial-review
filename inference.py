@@ -207,7 +207,7 @@ def run_task(task_id):
             print(f"[WARN] Step failed: {exc}", file=sys.stderr)
             done = True
 
-    final_score = max(0.001, min(0.999, total_reward))
+    final_score = max(0.002, min(0.998, total_reward))
     log_end(task_id, final_score)
     return final_score
 

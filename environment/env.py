@@ -121,7 +121,7 @@ class ClinicalTrialEnv:
         elif self.current_task_id == 3:
             score, breakdown, feedback_parts = self._reward_task3(action)
 
-        final_score = max(0.001, min(0.999, score))
+        final_score = max(0.002, min(0.998, score))
         return final_score, breakdown, " | ".join(feedback_parts)
 
     def _reward_task1(self, action: Action):
