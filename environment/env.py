@@ -8,6 +8,7 @@ from environment.data.rules import REQUIRED_SECTIONS, MAX_DRUG_DOSES, AGE_GUIDEL
 
 # ─── TYPED MODELS (required by OpenEnv spec) ───
 
+
 class Observation(BaseModel):
     trial_id: str
     protocol_text: dict
@@ -15,11 +16,13 @@ class Observation(BaseModel):
     step_number: int
     available_actions: list[str]
 
+
 class Action(BaseModel):
-    action_type: str        # "flag_issue", "approve_section", "recommend_amendment"
-    target_section: str     # which section this action is about
+    action_type: str  # "flag_issue", "approve_section", "recommend_amendment"
+    target_section: str  # which section this action is about
     issue_description: str  # agent's explanation
-    severity: str           # "low", "medium", "high", "critical"
+    severity: str  # "low", "medium", "high", "critical"
+
 
 class Reward(BaseModel):
     score: float
@@ -28,6 +31,7 @@ class Reward(BaseModel):
 
 
 # ─── MAIN ENVIRONMENT CLASS ───
+
 
 class ClinicalTrialEnv:
     def __init__(self):
@@ -41,9 +45,7 @@ class ClinicalTrialEnv:
 
     def _load_protocols(self):
         protocols = []
-        protocols_dir = os.path.join(
-            os.path.dirname(__file__), "data", "protocols"
-        )
+        protocols_dir = os.path.join(os.path.dirname(__file__), "data", "protocols")
         for filename in os.listdir(protocols_dir):
             if filename.endswith(".json"):
                 with open(os.path.join(protocols_dir, filename)) as f:
@@ -68,7 +70,7 @@ class ClinicalTrialEnv:
             protocol_text=self.current_protocol["sections"],
             task_description=task_descriptions[task_id],
             step_number=0,
-            available_actions=["flag_issue", "approve_section", "recommend_amendment"]
+            available_actions=["flag_issue", "approve_section", "recommend_amendment"],
         )
 
     def step(self, action: Action):
@@ -85,26 +87,26 @@ class ClinicalTrialEnv:
             protocol_text=self.current_protocol["sections"],
             task_description=f"Continue reviewing. Step {self.step_count} of {self.max_steps}.",
             step_number=self.step_count,
-            available_actions=["flag_issue", "approve_section", "recommend_amendment"]
+            available_actions=["flag_issue", "approve_section", "recommend_amendment"],
         )
 
         reward = Reward(
-            score=round(reward_score, 3),
-            breakdown=breakdown,
-            feedback=feedback
+            score=round(reward_score, 3), breakdown=breakdown, feedback=feedback
         )
 
         return next_obs, reward, done, {"total_reward": self.total_reward}
 
     def state(self):
         return {
-            "trial_id": self.current_protocol["trial_id"] if self.current_protocol else None,
+            "trial_id": self.current_protocol["trial_id"]
+            if self.current_protocol
+            else None,
             "current_task_id": self.current_task_id,
             "step_count": self.step_count,
             "max_steps": self.max_steps,
             "total_reward": self.total_reward,
             "actions_taken": len(self.agent_actions),
-            "agent_actions": self.agent_actions
+            "agent_actions": self.agent_actions,
         }
 
     def _calculate_reward(self, action: Action):
@@ -119,7 +121,7 @@ class ClinicalTrialEnv:
         elif self.current_task_id == 3:
             score, breakdown, feedback_parts = self._reward_task3(action)
 
-        final_score = max(0.0, min(1.0, score))
+        final_score = max(0.001, min(0.999, score))
         return final_score, breakdown, " | ".join(feedback_parts)
 
     def _reward_task1(self, action: Action):
@@ -166,7 +168,10 @@ class ClinicalTrialEnv:
         if action.action_type == "flag_issue":
             flagged_drug = None
             for drug in MAX_DRUG_DOSES:
-                if drug.lower() in action.target_section.lower() or drug.lower() in action.issue_description.lower():
+                if (
+                    drug.lower() in action.target_section.lower()
+                    or drug.lower() in action.issue_description.lower()
+                ):
                     flagged_drug = drug
                     break
 
@@ -185,7 +190,9 @@ class ClinicalTrialEnv:
             elif flagged_drug and flagged_drug not in unsafe_drugs:
                 score -= 0.15
                 breakdown["false_positive"] = -0.15
-                feedback.append(f"Incorrect: {flagged_drug} dosage is within safe limits")
+                feedback.append(
+                    f"Incorrect: {flagged_drug} dosage is within safe limits"
+                )
             else:
                 score -= 0.1
                 breakdown["unclear_flag"] = -0.1
@@ -211,14 +218,17 @@ class ClinicalTrialEnv:
                 desc_lower = action.issue_description.lower()
                 keyword_matches = sum(1 for w in key_words if w in desc_lower)
 
-                sections_mentioned = (sec_a in desc_lower or sec_a in action.target_section.lower()) and \
-                                     (sec_b in desc_lower or sec_b in action.target_section.lower())
+                sections_mentioned = (
+                    sec_a in desc_lower or sec_a in action.target_section.lower()
+                ) and (sec_b in desc_lower or sec_b in action.target_section.lower())
 
                 if keyword_matches >= 2 or sections_mentioned:
                     matched = True
                     score += 0.4
                     breakdown["contradiction_found"] = 0.4
-                    feedback.append(f"Correct contradiction identified between {sec_a} and {sec_b}")
+                    feedback.append(
+                        f"Correct contradiction identified between {sec_a} and {sec_b}"
+                    )
                     if len(action.issue_description) > 80:
                         score += 0.3
                         breakdown["detailed_explanation"] = 0.3
@@ -228,6 +238,8 @@ class ClinicalTrialEnv:
             if not matched:
                 score -= 0.1
                 breakdown["false_positive"] = -0.1
-                feedback.append("Contradiction flagged does not match known issues in this protocol")
+                feedback.append(
+                    "Contradiction flagged does not match known issues in this protocol"
+                )
 
         return score, breakdown, feedback

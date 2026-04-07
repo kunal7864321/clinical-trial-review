@@ -3,7 +3,7 @@ def grade_task1(agent_actions, ground_truth):
     actual_missing = set(ground_truth["missing_sections"])
 
     if not actual_missing:
-        return 1.0
+        return 0.999
 
     correctly_flagged = set()
     false_positives = 0
@@ -20,7 +20,7 @@ def grade_task1(agent_actions, ground_truth):
     penalty = false_positives * 0.1
     final = precision_score - penalty
 
-    return round(max(0.0, min(1.0, final)), 3)
+    return round(max(0.001, min(0.999, final)), 3)
 
 
 def grade_task2(agent_actions, ground_truth):
@@ -28,7 +28,7 @@ def grade_task2(agent_actions, ground_truth):
     unsafe_dosages = ground_truth["unsafe_dosages"]
 
     if not unsafe_dosages:
-        return 1.0
+        return 0.999
 
     unsafe_drugs = [u["drug"] for u in unsafe_dosages]
     correctly_flagged = set()
@@ -51,7 +51,7 @@ def grade_task2(agent_actions, ground_truth):
     penalty = false_positives * 0.1
     final = recall - penalty
 
-    return round(max(0.0, min(1.0, final)), 3)
+    return round(max(0.001, min(0.999, final)), 3)
 
 
 def grade_task3(agent_actions, ground_truth):
@@ -59,7 +59,7 @@ def grade_task3(agent_actions, ground_truth):
     contradictions = ground_truth["contradictions"]
 
     if not contradictions:
-        return 1.0
+        return 0.999
 
     found_contradictions = set()
     false_positives = 0
@@ -76,8 +76,9 @@ def grade_task3(agent_actions, ground_truth):
                 desc_words = contradiction["description"].lower().split()
                 key_words = [w for w in desc_words if len(w) > 5][:5]
                 keyword_matches = sum(1 for w in key_words if w in desc)
-                sections_mentioned = (sec_a in desc or sec_a in target) and \
-                                     (sec_b in desc or sec_b in target)
+                sections_mentioned = (sec_a in desc or sec_a in target) and (
+                    sec_b in desc or sec_b in target
+                )
 
                 if keyword_matches >= 2 or sections_mentioned:
                     found_contradictions.add(i)
@@ -91,4 +92,4 @@ def grade_task3(agent_actions, ground_truth):
     penalty = false_positives * 0.1
     final = recall - penalty
 
-    return round(max(0.0, min(1.0, final)), 3)
+    return round(max(0.001, min(0.999, final)), 3)
