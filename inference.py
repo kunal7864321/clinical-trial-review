@@ -180,7 +180,7 @@ def run_task(task_id):
         )
         step += 1
 
-    final_score = max(0.0, min(1.0, total_reward))
+    final_score = max(0.001, min(0.999, total_reward))
     log_end(task_id, final_score)
     return final_score
 
