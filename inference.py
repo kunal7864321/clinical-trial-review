@@ -12,16 +12,16 @@ except ModuleNotFoundError:
 from openai import OpenAI
 
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
-HF_TOKEN = os.environ.get("HF_TOKEN")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN = os.environ.get("HF_TOKEN", os.environ.get("HF_API_KEY"))
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 BASE_URL = os.environ.get("ENV_URL", "http://127.0.0.1:7860")
 
-if not HF_TOKEN:
-    raise RuntimeError("HF_TOKEN environment variable is required to run inference.")
-
-client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
+if HF_TOKEN:
+    client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
+else:
+    client = None
 
 
 def log_start(task_id, trial_id):
@@ -89,6 +89,11 @@ def post_env(path, params=None, payload=None, timeout=30):
 
 def ask_agent(task_description, protocol_text, step_number):
     """Ask the LLM what action to take given the current observation."""
+    if client is None:
+        raise RuntimeError(
+            "OpenAI client not initialized. Set HF_TOKEN or HF_API_KEY environment variable."
+        )
+
     prompt = f"""You are an expert clinical trial protocol reviewer.
 
 TASK: {task_description}
