@@ -25,12 +25,12 @@ else:
 
 
 def log_start(task_id, trial_id):
-    print(f"START task_id={task_id} trial_id={trial_id}")
+    print(f"[START] task_id={task_id} trial_id={trial_id}")
 
 
 def log_step(task_id, step_number, action, reward, done, feedback):
     print(
-        "STEP "
+        "[STEP] "
         f"task_id={task_id} "
         f"step={step_number} "
         f"action={action.get('action_type')} "
@@ -42,7 +42,7 @@ def log_step(task_id, step_number, action, reward, done, feedback):
 
 
 def log_end(task_id, final_score):
-    print(f"END task_id={task_id} final_score={final_score:.3f}")
+    print(f"[END] task_id={task_id} final_score={final_score:.3f}")
 
 
 def _build_url(url, params):
@@ -190,7 +190,7 @@ def main():
     for task_id in [1, 2, 3]:
         scores[f"task_{task_id}"] = run_task(task_id)
     average = sum(scores.values()) / len(scores)
-    print("SUMMARY average_score={:.3f}".format(average))
+    print("[SUMMARY] average_score={:.3f}".format(average))
 
 
 if __name__ == "__main__":
