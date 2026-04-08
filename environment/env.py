@@ -14,8 +14,7 @@ _SCORE_MAX = 0.999
 
 def clamp_score(value: float) -> float:
     """Clamp a score to be strictly within (0, 1) — never 0.0 or 1.0."""
-    clamped = max(_SCORE_MIN, min(_SCORE_MAX, value))
-    return round(float(clamped), 6)
+    return float(max(0.001, min(0.999, value)))
 
 
 # ─── TYPED MODELS (required by OpenEnv spec) ───
