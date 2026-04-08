@@ -181,10 +181,10 @@ def run_task(task_id):
 
     log_start(task_id, obs["trial_id"])
 
-    total_reward = 0.002
     done = False
     step = 0
     max_steps = 20
+    env_total_reward = 0.002  # mirrors environment's clamped total_reward
 
     while not done and step < max_steps:
         try:
@@ -197,7 +197,8 @@ def run_task(task_id):
 
             reward = result_data["reward"]["score"]
             feedback = result_data["reward"]["feedback"]
-            total_reward += reward
+            # Use the environment's clamped total_reward (already in (0,1))
+            env_total_reward = result_data["info"]["total_reward"]
             done = result_data["done"]
             obs = result_data["observation"]
 
@@ -214,9 +215,11 @@ def run_task(task_id):
             print(f"[WARN] Step failed: {exc}", file=sys.stderr)
             done = True
 
-    final_score = max(0.002, min(0.998, total_reward))
+    # Clamp again as a safety net — should already be in range from env
+    final_score = max(0.002, min(0.998, env_total_reward))
     log_end(task_id, final_score)
     return final_score
+
 
 
 def main():

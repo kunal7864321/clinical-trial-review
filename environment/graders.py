@@ -1,5 +1,5 @@
 def grade_task1(agent_actions, ground_truth):
-    """Missing section detection — score 0.0 to 1.0"""
+    """Missing section detection — score strictly in (0, 1)"""
     actual_missing = set(ground_truth["missing_sections"])
 
     if not actual_missing:
@@ -24,7 +24,7 @@ def grade_task1(agent_actions, ground_truth):
 
 
 def grade_task2(agent_actions, ground_truth):
-    """Dosage safety compliance — score 0.0 to 1.0"""
+    """Dosage safety compliance — score strictly in (0, 1)"""
     unsafe_dosages = ground_truth["unsafe_dosages"]
 
     if not unsafe_dosages:
@@ -55,7 +55,7 @@ def grade_task2(agent_actions, ground_truth):
 
 
 def grade_task3(agent_actions, ground_truth):
-    """Contradiction detection — score 0.0 to 1.0"""
+    """Contradiction detection — score strictly in (0, 1)"""
     contradictions = ground_truth["contradictions"]
 
     if not contradictions:
