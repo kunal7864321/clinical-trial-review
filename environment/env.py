@@ -8,13 +8,13 @@ from environment.data.rules import REQUIRED_SECTIONS, MAX_DRUG_DOSES, AGE_GUIDEL
 
 # ─── Score clamping helper ───
 # Strictly between 0 and 1 (exclusive): (0, 1)
-_SCORE_MIN = 0.001
-_SCORE_MAX = 0.999
+_SCORE_MIN = 0.01
+_SCORE_MAX = 0.99
 
 
 def clamp_score(value: float) -> float:
     """Clamp a score to be strictly within (0, 1) — never 0.0 or 1.0."""
-    return float(max(0.001, min(0.999, value)))
+    return float(max(0.01, min(0.99, value)))
 
 
 # ─── TYPED MODELS (required by OpenEnv spec) ───
@@ -57,7 +57,7 @@ class ClinicalTrialEnv:
         self.step_count = 0
         self.agent_actions = []
         self.max_steps = 20
-        self.total_reward = clamp_score(0.001)
+        self.total_reward = clamp_score(0.01)
         self.current_task_description = ""
         self.protocols = self._load_protocols()
 
@@ -73,7 +73,7 @@ class ClinicalTrialEnv:
     def reset(self, task_id: int = 1) -> Observation:
         self.current_protocol = random.choice(self.protocols)
         self.current_task_id = task_id
-        self.total_reward = clamp_score(0.001)
+        self.total_reward = clamp_score(0.01)
         self.step_count = 0
         self.agent_actions = []
 
@@ -132,7 +132,7 @@ class ClinicalTrialEnv:
     def _calculate_reward(self, action: Action):
         breakdown = {}
         feedback_parts = []
-        score = 0.001
+        score = 0.01
 
         if self.current_task_id == 1:
             score, breakdown, feedback_parts = self._reward_task1(action)

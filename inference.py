@@ -152,7 +152,7 @@ def parse_action(raw_text):
         json_match = re.search(r"```json\s*(.*?)\s*```", raw_text, re.DOTALL)
         if json_match:
             return json.loads(json_match.group(1).strip())
-        
+
         # Try to find anything that looks like a JSON object
         json_match = re.search(r"(\{.*\})", raw_text, re.DOTALL)
         if json_match:
@@ -171,7 +171,7 @@ def parse_action(raw_text):
 
 def _clamp_score(value):
     """Clamp a score to be strictly within (0, 1) — never 0.0 or 1.0."""
-    return float(max(0.001, min(0.999, value)))
+    return float(max(0.01, min(0.99, value)))
 
 
 def run_task(task_id):
@@ -181,15 +181,15 @@ def run_task(task_id):
     except Exception as exc:
         print(f"[WARN] Failed to reset environment: {exc}", file=sys.stderr)
         log_start(task_id, "unknown")
-        log_end(task_id, _clamp_score(0.001))
-        return _clamp_score(0.001)
+        log_end(task_id, _clamp_score(0.01))
+        return _clamp_score(0.01)
 
     log_start(task_id, obs["trial_id"])
 
     done = False
     step = 0
     max_steps = 20
-    env_total_reward = _clamp_score(0.001)
+    env_total_reward = _clamp_score(0.01)
 
     while not done and step < max_steps:
         try:
@@ -236,4 +236,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -4,8 +4,8 @@ Every grader returns a score strictly in (0, 1) — never 0.0, never 1.0.
 """
 
 # Strict bounds — scores must be > 0 and < 1
-_SCORE_MIN = 0.001
-_SCORE_MAX = 0.999
+_SCORE_MIN = 0.01
+_SCORE_MAX = 0.99
 
 
 def _clamp(value: float) -> float:
