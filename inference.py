@@ -169,6 +169,11 @@ def parse_action(raw_text):
         }
 
 
+def _clamp_score(value):
+    """Clamp a score to be strictly within (0, 1) — never 0.0 or 1.0."""
+    return float(max(0.001, min(0.999, value)))
+
+
 def run_task(task_id):
     """Run one full episode for a given task and return the final score."""
     try:
@@ -176,15 +181,15 @@ def run_task(task_id):
     except Exception as exc:
         print(f"[WARN] Failed to reset environment: {exc}", file=sys.stderr)
         log_start(task_id, "unknown")
-        log_end(task_id, 0.002)
-        return 0.002
+        log_end(task_id, _clamp_score(0.001))
+        return _clamp_score(0.001)
 
     log_start(task_id, obs["trial_id"])
 
     done = False
     step = 0
     max_steps = 20
-    env_total_reward = 0.002  # mirrors environment's clamped total_reward
+    env_total_reward = _clamp_score(0.001)
 
     while not done and step < max_steps:
         try:
@@ -206,7 +211,7 @@ def run_task(task_id):
                 task_id,
                 step_number=step + 1,
                 action=action,
-                reward=reward,
+                reward=_clamp_score(reward),
                 done=done,
                 feedback=feedback,
             )
@@ -215,20 +220,20 @@ def run_task(task_id):
             print(f"[WARN] Step failed: {exc}", file=sys.stderr)
             done = True
 
-    # Clamp again as a safety net — should already be in range from env
-    final_score = max(0.002, min(0.998, env_total_reward))
+    # Final clamp — guarantees score is always in (0, 1)
+    final_score = _clamp_score(env_total_reward)
     log_end(task_id, final_score)
     return final_score
-
 
 
 def main():
     scores = {}
     for task_id in [1, 2, 3]:
         scores[f"task_{task_id}"] = run_task(task_id)
-    average = sum(scores.values()) / len(scores)
+    average = _clamp_score(sum(scores.values()) / len(scores))
     print("[SUMMARY] average_score={:.3f}".format(average))
 
 
 if __name__ == "__main__":
     main()
+

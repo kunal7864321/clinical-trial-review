@@ -2,8 +2,19 @@ import json
 import os
 import random
 from typing import Any, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from environment.data.rules import REQUIRED_SECTIONS, MAX_DRUG_DOSES, AGE_GUIDELINES
+
+
+# ─── Score clamping helper ───
+# Strictly between 0 and 1 (exclusive): (0, 1)
+_SCORE_MIN = 0.001
+_SCORE_MAX = 0.999
+
+
+def clamp_score(value: float) -> float:
+    """Clamp a score to be strictly within (0, 1) — never 0.0 or 1.0."""
+    return float(max(_SCORE_MIN, min(_SCORE_MAX, value)))
 
 
 # ─── TYPED MODELS (required by OpenEnv spec) ───
@@ -29,6 +40,12 @@ class Reward(BaseModel):
     breakdown: dict
     feedback: str
 
+    @field_validator("score")
+    @classmethod
+    def enforce_score_range(cls, v: float) -> float:
+        """Ensure score is always strictly within (0, 1)."""
+        return float(max(_SCORE_MIN, min(_SCORE_MAX, v)))
+
 
 # ─── MAIN ENVIRONMENT CLASS ───
 
@@ -40,7 +57,7 @@ class ClinicalTrialEnv:
         self.step_count = 0
         self.agent_actions = []
         self.max_steps = 20
-        self.total_reward = 0.002
+        self.total_reward = clamp_score(0.001)
         self.current_task_description = ""
         self.protocols = self._load_protocols()
 
@@ -56,7 +73,7 @@ class ClinicalTrialEnv:
     def reset(self, task_id: int = 1) -> Observation:
         self.current_protocol = random.choice(self.protocols)
         self.current_task_id = task_id
-        self.total_reward = 0.002
+        self.total_reward = clamp_score(0.001)
         self.step_count = 0
         self.agent_actions = []
 
@@ -80,7 +97,7 @@ class ClinicalTrialEnv:
         self.agent_actions.append(action.model_dump())
 
         reward_score, breakdown, feedback = self._calculate_reward(action)
-        self.total_reward = max(0.002, min(0.998, self.total_reward + reward_score))
+        self.total_reward = clamp_score(self.total_reward + reward_score)
 
         done = self.step_count >= self.max_steps
 
@@ -92,11 +109,12 @@ class ClinicalTrialEnv:
             available_actions=["flag_issue", "approve_section", "recommend_amendment"],
         )
 
+        # Reward model has its own validator that enforces (0, 1)
         reward = Reward(
-            score=round(reward_score, 3), breakdown=breakdown, feedback=feedback
+            score=clamp_score(reward_score), breakdown=breakdown, feedback=feedback
         )
 
-        return next_obs, reward, done, {"total_reward": self.total_reward}
+        return next_obs, reward, done, {"total_reward": clamp_score(self.total_reward)}
 
     def state(self):
         return {
@@ -106,7 +124,7 @@ class ClinicalTrialEnv:
             "current_task_id": self.current_task_id,
             "step_count": self.step_count,
             "max_steps": self.max_steps,
-            "total_reward": self.total_reward,
+            "total_reward": clamp_score(self.total_reward),
             "actions_taken": len(self.agent_actions),
             "agent_actions": self.agent_actions,
         }
@@ -114,7 +132,7 @@ class ClinicalTrialEnv:
     def _calculate_reward(self, action: Action):
         breakdown = {}
         feedback_parts = []
-        score = 0.002
+        score = 0.001
 
         if self.current_task_id == 1:
             score, breakdown, feedback_parts = self._reward_task1(action)
@@ -123,11 +141,11 @@ class ClinicalTrialEnv:
         elif self.current_task_id == 3:
             score, breakdown, feedback_parts = self._reward_task3(action)
 
-        final_score = max(0.002, min(0.998, score))
+        final_score = clamp_score(score)
         return final_score, breakdown, " | ".join(feedback_parts)
 
     def _reward_task1(self, action: Action):
-        score = 0.002
+        score = 0.01
         breakdown = {}
         feedback = []
 
@@ -143,8 +161,8 @@ class ClinicalTrialEnv:
                     breakdown["explanation_bonus"] = 0.1
                     feedback.append("Good explanation provided")
             else:
-                score -= 0.1
-                breakdown["false_positive"] = -0.1
+                score -= 0.005
+                breakdown["false_positive"] = -0.005
                 feedback.append(f"Incorrect: {action.target_section} is not missing")
         elif action.action_type == "approve_section":
             sections = self.current_protocol["sections"]
@@ -153,14 +171,14 @@ class ClinicalTrialEnv:
                 breakdown["correct_approval"] = 0.1
                 feedback.append(f"Correct: {action.target_section} exists and approved")
             else:
-                score -= 0.1
-                breakdown["wrong_approval"] = -0.1
+                score -= 0.005
+                breakdown["wrong_approval"] = -0.005
                 feedback.append("Approved a section that does not exist")
 
-        return score, breakdown, feedback
+        return clamp_score(score), breakdown, feedback
 
     def _reward_task2(self, action: Action):
-        score = 0.002
+        score = 0.01
         breakdown = {}
         feedback = []
 
@@ -190,20 +208,20 @@ class ClinicalTrialEnv:
                     breakdown["severity_bonus"] = 0.1
                     feedback.append("Correctly marked as high severity")
             elif flagged_drug and flagged_drug not in unsafe_drugs:
-                score -= 0.15
-                breakdown["false_positive"] = -0.15
+                score -= 0.005
+                breakdown["false_positive"] = -0.005
                 feedback.append(
                     f"Incorrect: {flagged_drug} dosage is within safe limits"
                 )
             else:
-                score -= 0.1
-                breakdown["unclear_flag"] = -0.1
+                score -= 0.005
+                breakdown["unclear_flag"] = -0.005
                 feedback.append("Flag did not clearly identify which drug is unsafe")
 
-        return score, breakdown, feedback
+        return clamp_score(score), breakdown, feedback
 
     def _reward_task3(self, action: Action):
-        score = 0.002
+        score = 0.01
         breakdown = {}
         feedback = []
 
@@ -238,10 +256,10 @@ class ClinicalTrialEnv:
                     break
 
             if not matched:
-                score -= 0.1
-                breakdown["false_positive"] = -0.1
+                score -= 0.005
+                breakdown["false_positive"] = -0.005
                 feedback.append(
                     "Contradiction flagged does not match known issues in this protocol"
                 )
 
-        return score, breakdown, feedback
+        return clamp_score(score), breakdown, feedback

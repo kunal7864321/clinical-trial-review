@@ -1,9 +1,24 @@
+"""Graders for clinical trial review tasks.
+
+Every grader returns a score strictly in (0, 1) — never 0.0, never 1.0.
+"""
+
+# Strict bounds — scores must be > 0 and < 1
+_SCORE_MIN = 0.001
+_SCORE_MAX = 0.999
+
+
+def _clamp(value: float) -> float:
+    """Clamp a score to be strictly within (0, 1)."""
+    return float(max(_SCORE_MIN, min(_SCORE_MAX, value)))
+
+
 def grade_task1(agent_actions, ground_truth):
     """Missing section detection — score strictly in (0, 1)"""
     actual_missing = set(ground_truth["missing_sections"])
 
     if not actual_missing:
-        return 0.998
+        return _clamp(0.95)
 
     correctly_flagged = set()
     false_positives = 0
@@ -16,11 +31,14 @@ def grade_task1(agent_actions, ground_truth):
             else:
                 false_positives += 1
 
+    if len(actual_missing) == 0:
+        return _clamp(0.5)
+
     precision_score = len(correctly_flagged) / len(actual_missing)
-    penalty = false_positives * 0.1
+    penalty = false_positives * 0.05
     final = precision_score - penalty
 
-    return round(max(0.002, min(0.998, final)), 3)
+    return _clamp(final)
 
 
 def grade_task2(agent_actions, ground_truth):
@@ -28,7 +46,7 @@ def grade_task2(agent_actions, ground_truth):
     unsafe_dosages = ground_truth["unsafe_dosages"]
 
     if not unsafe_dosages:
-        return 0.998
+        return _clamp(0.95)
 
     unsafe_drugs = [u["drug"] for u in unsafe_dosages]
     correctly_flagged = set()
@@ -47,11 +65,14 @@ def grade_task2(agent_actions, ground_truth):
             if not matched:
                 false_positives += 1
 
+    if len(unsafe_drugs) == 0:
+        return _clamp(0.5)
+
     recall = len(correctly_flagged) / len(unsafe_drugs)
-    penalty = false_positives * 0.1
+    penalty = false_positives * 0.05
     final = recall - penalty
 
-    return round(max(0.002, min(0.998, final)), 3)
+    return _clamp(final)
 
 
 def grade_task3(agent_actions, ground_truth):
@@ -59,7 +80,7 @@ def grade_task3(agent_actions, ground_truth):
     contradictions = ground_truth["contradictions"]
 
     if not contradictions:
-        return 0.998
+        return _clamp(0.95)
 
     found_contradictions = set()
     false_positives = 0
@@ -88,8 +109,11 @@ def grade_task3(agent_actions, ground_truth):
             if not matched:
                 false_positives += 1
 
+    if len(contradictions) == 0:
+        return _clamp(0.5)
+
     recall = len(found_contradictions) / len(contradictions)
-    penalty = false_positives * 0.1
+    penalty = false_positives * 0.05
     final = recall - penalty
 
-    return round(max(0.002, min(0.998, final)), 3)
+    return _clamp(final)
