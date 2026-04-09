@@ -1,54 +1,44 @@
 import json
 import os
 import random
-from typing import Any, Literal
+from typing import Any, Literal, List, Dict
 from pydantic import BaseModel, Field, field_validator
 from environment.data.rules import REQUIRED_SECTIONS, MAX_DRUG_DOSES, AGE_GUIDELINES
 
-
 # ─── Score clamping helper ───
-# Strictly between 0 and 1 (exclusive): (0, 1)
 _SCORE_MIN = 0.000001
 _SCORE_MAX = 0.99
 
-
 def clamp_score(value: float) -> float:
     """Clamp a score to be strictly within (0, 1) — never 0.0 or 1.0."""
-    return float(max(0.000001, min(0.99, value)))
-
+    return float(max(_SCORE_MIN, min(_SCORE_MAX, value)))
 
 # ─── TYPED MODELS (required by OpenEnv spec) ───
 
-
 class Observation(BaseModel):
     trial_id: str
-    protocol_text: dict
+    protocol_text: Dict[str, Any]
     task_description: str
     step_number: int
-    available_actions: list[str]
-
+    available_actions: List[str]
 
 class Action(BaseModel):
     action_type: Literal["flag_issue", "approve_section", "recommend_amendment"]
-    target_section: str  # which section this action is about
-    issue_description: str  # agent's explanation
+    target_section: str
+    issue_description: str
     severity: Literal["low", "medium", "high", "critical"]
-
 
 class Reward(BaseModel):
     score: float
-    breakdown: dict
+    breakdown: Dict[str, float]
     feedback: str
 
     @field_validator("score")
     @classmethod
     def enforce_score_range(cls, v: float) -> float:
-        """Ensure score is always strictly within (0, 1)."""
-        return float(max(_SCORE_MIN, min(_SCORE_MAX, v)))
-
+        return clamp_score(v)
 
 # ─── MAIN ENVIRONMENT CLASS ───
-
 
 class ClinicalTrialEnv:
     def __init__(self):
@@ -63,7 +53,12 @@ class ClinicalTrialEnv:
 
     def _load_protocols(self):
         protocols = []
-        protocols_dir = os.path.join(os.path.dirname(__file__), "data", "protocols")
+        base_dir = os.path.dirname(__file__)
+        protocols_dir = os.path.join(base_dir, "data", "protocols")
+        
+        if not os.path.exists(protocols_dir):
+            return []
+
         for filename in os.listdir(protocols_dir):
             if filename.endswith(".json"):
                 with open(os.path.join(protocols_dir, filename)) as f:
@@ -71,6 +66,9 @@ class ClinicalTrialEnv:
         return protocols
 
     def reset(self, task_id: int = 1) -> Observation:
+        if not self.protocols:
+            raise ValueError("No protocols found in data/protocols")
+            
         self.current_protocol = random.choice(self.protocols)
         self.current_task_id = task_id
         self.total_reward = clamp_score(0.000001)
@@ -78,12 +76,13 @@ class ClinicalTrialEnv:
         self.agent_actions = []
 
         task_descriptions = {
-            1: "TASK 1 - EASY: Read this clinical trial protocol carefully. Identify all MISSING required sections. Required sections are: objectives, inclusion_criteria, exclusion_criteria, dosage, adverse_event_reporting, statistical_analysis_plan, withdrawal_criteria, informed_consent. Flag each missing section using action_type='flag_issue'.",
-            2: "TASK 2 - MEDIUM: Read this clinical trial protocol carefully. Identify any drug dosages that exceed the maximum allowed limits. DrugX max=500mg/day, DrugY max=2000mg/day, DrugZ max=750mg/day, DrugA max=1000mg/day, DrugB max=300mg/day. Flag each unsafe dosage using action_type='flag_issue'.",
-            3: "TASK 3 - HARD: Read this clinical trial protocol carefully. Identify any internal contradictions between different sections of the protocol. A contradiction is when two sections say things that conflict with each other. Flag each contradiction using action_type='flag_issue' and explain both sections that conflict.",
+            1: "TASK 1 - EASY: Identify all MISSING required sections in the clinical trial protocol. Required sections are: objectives, inclusion_criteria, exclusion_criteria, dosage, adverse_event_reporting, statistical_analysis_plan, withdrawal_criteria, informed_consent. Flag each missing section using action_type='flag_issue'.",
+            2: "TASK 2 - MEDIUM: Identify any drug dosages that exceed the maximum allowed limits (DrugX: 500mg, DrugY: 2000mg, DrugZ: 750mg, DrugA: 1000mg, DrugB: 300mg). Flag each unsafe dosage using action_type='flag_issue'.",
+            3: "TASK 3 - HARD: Identify internal contradictions between different sections of the protocol. Flag each contradiction using action_type='flag_issue' and explain the conflict.",
         }
 
-        self.current_task_description = task_descriptions[task_id]
+        self.current_task_description = task_descriptions.get(task_id, "Analyze the protocol for issues.")
+        
         return Observation(
             trial_id=self.current_protocol["trial_id"],
             protocol_text=self.current_protocol["sections"],
@@ -109,157 +108,66 @@ class ClinicalTrialEnv:
             available_actions=["flag_issue", "approve_section", "recommend_amendment"],
         )
 
-        # Reward model has its own validator that enforces (0, 1)
         reward = Reward(
-            score=clamp_score(reward_score), breakdown=breakdown, feedback=feedback
+            score=reward_score,
+            breakdown=breakdown,
+            feedback=feedback
         )
 
-        return next_obs, reward, done, {"total_reward": clamp_score(self.total_reward)}
+        return next_obs, reward, done, {"total_reward": self.total_reward}
 
     def state(self):
         return {
-            "trial_id": self.current_protocol["trial_id"]
-            if self.current_protocol
-            else None,
+            "trial_id": self.current_protocol["trial_id"] if self.current_protocol else None,
             "current_task_id": self.current_task_id,
             "step_count": self.step_count,
             "max_steps": self.max_steps,
-            "total_reward": clamp_score(self.total_reward),
-            "actions_taken": len(self.agent_actions),
+            "total_reward": self.total_reward,
             "agent_actions": self.agent_actions,
         }
 
     def _calculate_reward(self, action: Action):
-        breakdown = {}
-        feedback_parts = []
-        score = 0.000001
-
         if self.current_task_id == 1:
-            score, breakdown, feedback_parts = self._reward_task1(action)
+            return self._reward_task1(action)
         elif self.current_task_id == 2:
-            score, breakdown, feedback_parts = self._reward_task2(action)
+            return self._reward_task2(action)
         elif self.current_task_id == 3:
-            score, breakdown, feedback_parts = self._reward_task3(action)
-
-        final_score = clamp_score(score)
-        return final_score, breakdown, " | ".join(feedback_parts)
+            return self._reward_task3(action)
+        return 0.000001, {}, "Unknown task"
 
     def _reward_task1(self, action: Action):
-        score = 0.000001
-        breakdown = {}
-        feedback = []
-
-        missing = self.current_protocol["ground_truth"]["missing_sections"]
-
-        if action.action_type == "flag_issue":
-            if action.target_section in missing:
-                score += 0.3
-                breakdown["correct_flag"] = 0.3
-                feedback.append(f"Correct: {action.target_section} is indeed missing")
-                if len(action.issue_description) > 50:
-                    score += 0.1
-                    breakdown["explanation_bonus"] = 0.1
-                    feedback.append("Good explanation provided")
-            else:
-                score -= 0.005
-                breakdown["false_positive"] = -0.005
-                feedback.append(f"Incorrect: {action.target_section} is not missing")
-        elif action.action_type == "approve_section":
-            sections = self.current_protocol["sections"]
-            if action.target_section in sections:
-                score += 0.1
-                breakdown["correct_approval"] = 0.1
-                feedback.append(f"Correct: {action.target_section} exists and approved")
-            else:
-                score -= 0.005
-                breakdown["wrong_approval"] = -0.005
-                feedback.append("Approved a section that does not exist")
-
-        return clamp_score(score), breakdown, feedback
+        missing = self.current_protocol["ground_truth"].get("missing_sections", [])
+        if action.action_type == "flag_issue" and action.target_section in missing:
+            return 0.3, {"correct_flag": 0.3}, f"Correct: {action.target_section} is missing"
+        elif action.action_type == "flag_issue":
+            return -0.05, {"false_positive": -0.05}, f"Incorrect: {action.target_section} is present"
+        return 0.000001, {}, "No reward for this action"
 
     def _reward_task2(self, action: Action):
-        score = 0.000001
-        breakdown = {}
-        feedback = []
-
-        unsafe = self.current_protocol["ground_truth"]["unsafe_dosages"]
-        unsafe_drugs = [u["drug"] for u in unsafe]
-
+        unsafe = self.current_protocol["ground_truth"].get("unsafe_dosages", [])
+        unsafe_drugs = [u["drug"].lower() for u in unsafe]
+        
         if action.action_type == "flag_issue":
-            flagged_drug = None
+            found_drug = None
             for drug in MAX_DRUG_DOSES:
-                if (
-                    drug.lower() in action.target_section.lower()
-                    or drug.lower() in action.issue_description.lower()
-                ):
-                    flagged_drug = drug
+                if drug.lower() in action.target_section.lower() or drug.lower() in action.issue_description.lower():
+                    found_drug = drug.lower()
                     break
-
-            if flagged_drug and flagged_drug in unsafe_drugs:
-                score += 0.4
-                breakdown["correct_unsafe_flag"] = 0.4
-                feedback.append(f"Correct: {flagged_drug} dosage is unsafe")
-                if len(action.issue_description) > 50:
-                    score += 0.2
-                    breakdown["explanation_bonus"] = 0.2
-                    feedback.append("Good explanation with details")
-                if action.severity in ["high", "critical"]:
-                    score += 0.1
-                    breakdown["severity_bonus"] = 0.1
-                    feedback.append("Correctly marked as high severity")
-            elif flagged_drug and flagged_drug not in unsafe_drugs:
-                score -= 0.005
-                breakdown["false_positive"] = -0.005
-                feedback.append(
-                    f"Incorrect: {flagged_drug} dosage is within safe limits"
-                )
-            else:
-                score -= 0.005
-                breakdown["unclear_flag"] = -0.005
-                feedback.append("Flag did not clearly identify which drug is unsafe")
-
-        return clamp_score(score), breakdown, feedback
+            
+            if found_drug and found_drug in unsafe_drugs:
+                return 0.4, {"correct_dosage_flag": 0.4}, f"Correct: {found_drug} dosage is unsafe"
+            elif found_drug:
+                return -0.05, {"false_positive": -0.05}, f"Incorrect: {found_drug} dosage is safe"
+        return 0.000001, {}, "No reward for this action"
 
     def _reward_task3(self, action: Action):
-        score = 0.000001
-        breakdown = {}
-        feedback = []
-
-        contradictions = self.current_protocol["ground_truth"]["contradictions"]
-
+        contradictions = self.current_protocol["ground_truth"].get("contradictions", [])
         if action.action_type == "flag_issue":
-            matched = False
-            for contradiction in contradictions:
-                sec_a = contradiction["section_a"].lower()
-                sec_b = contradiction["section_b"].lower()
-                desc_words = contradiction["description"].lower().split()
-                key_words = [w for w in desc_words if len(w) > 5][:5]
-
-                desc_lower = action.issue_description.lower()
-                keyword_matches = sum(1 for w in key_words if w in desc_lower)
-
-                sections_mentioned = (
-                    sec_a in desc_lower or sec_a in action.target_section.lower()
-                ) and (sec_b in desc_lower or sec_b in action.target_section.lower())
-
-                if keyword_matches >= 2 or sections_mentioned:
-                    matched = True
-                    score += 0.4
-                    breakdown["contradiction_found"] = 0.4
-                    feedback.append(
-                        f"Correct contradiction identified between {sec_a} and {sec_b}"
-                    )
-                    if len(action.issue_description) > 80:
-                        score += 0.3
-                        breakdown["detailed_explanation"] = 0.3
-                        feedback.append("Excellent detailed explanation")
-                    break
-
-            if not matched:
-                score -= 0.005
-                breakdown["false_positive"] = -0.005
-                feedback.append(
-                    "Contradiction flagged does not match known issues in this protocol"
-                )
-
-        return clamp_score(score), breakdown, feedback
+            for c in contradictions:
+                sec_a, sec_b = c["section_a"].lower(), c["section_b"].lower()
+                desc = action.issue_description.lower()
+                if (sec_a in desc or sec_a in action.target_section.lower()) and \
+                   (sec_b in desc or sec_b in action.target_section.lower()):
+                    return 0.5, {"contradiction_found": 0.5}, "Correct contradiction identified"
+            return -0.05, {"false_positive": -0.05}, "No matching contradiction found"
+        return 0.000001, {}, "No reward for this action"

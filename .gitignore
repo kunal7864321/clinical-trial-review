@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv
+dist/
+build/
+*.egg-info/
+.ruff_cache/
+*.log
+state_check.json
+state_output.json
